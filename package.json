@@ -1,0 +1,25 @@
+{
+  "name": "prototype",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build && node scripts/prepare-sites-build.mjs",
+    "build:pages": "vite build --base=/nie-danru-20th-birthday/ --outDir=dist-pages",
+    "preview": "vite preview",
+    "test:sites": "node --test tests/sites-worker.test.mjs"
+  },
+  "dependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "@vitejs/plugin-react": "5.0.4",
+    "gsap": "^3.15.0",
+    "lucide-react": "^0.468.0",
+    "motion": "^12.43.0",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "react-router-dom": "^7.18.2",
+    "tailwindcss": "^4.3.3",
+    "vite": "6.4.2"
+  }
+}

@@ -1,0 +1,11 @@
+node_modules/
+dist/
+dist-pages/
+tmp/
+.openai/
+*.log
+/.sites-dev*
+/*.png
+/*.jpg
+AGENTS.md
+design-qa.md
