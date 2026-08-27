@@ -24,7 +24,7 @@ button { cursor: pointer; }
 .birthday-site { min-height: 100vh; background: #050806; }
 .experience { position: relative; height: 580vh; }
 
-.video-stage { position: fixed; inset: -3%; z-index: 0; transform: scale(1.05); transform-origin: center; overflow: hidden; will-change: transform; }
+.video-stage { position: fixed; inset: -3%; z-index: 0; transform: scale(1.05); transform-origin: center; overflow: hidden; pointer-events: none; will-change: transform; }
 .scroll-video, .video-poster { width: 100%; height: 100%; object-fit: cover; transform: scale(1.12); }
 .scroll-video { background: #0b120d url("../birthday-hero.png") center / cover no-repeat; }
 .video-poster { position: absolute; inset: 0; z-index: 1; pointer-events: none; will-change: opacity; }
@@ -172,6 +172,7 @@ button { cursor: pointer; }
 .audio-copy { min-width: 0; flex: 1; }
 .audio-copy strong { display: block; overflow: hidden; font-size: 13px; letter-spacing: .04em; text-overflow: ellipsis; white-space: nowrap; }
 .audio-copy > span { display: block; margin-top: 4px; color: rgba(255,255,255,.42); font-size: 10px; }
+.audio-copy > span.audio-error { color: #f4e8ba; }
 .audio-timeline { display: flex; align-items: center; gap: 12px; margin-top: 11px; }
 .audio-timeline input { min-width: 0; width: 100%; accent-color: #dff477; }
 .audio-timeline time { flex: 0 0 auto; color: rgba(255,255,255,.46); font-size: 9px; font-variant-numeric: tabular-nums; }
@@ -181,6 +182,8 @@ button { cursor: pointer; }
 .record-mark { position: relative; width: 108px; height: 108px; display: grid; place-items: center; margin-bottom: 20px; border: 1px solid rgba(223,244,119,.4); border-radius: 50%; color: #dff477; box-shadow: 0 0 60px rgba(215,241,94,.12); }
 .record-mark span { position: absolute; right: -8px; bottom: -3px; font-family: "Instrument Serif", serif; font-size: 38px; font-style: italic; color: #fff; }
 @media (max-width: 768px) {
+  .birthday-site { touch-action: pan-y; }
+  .experience { height: var(--story-height, 580vh); }
   .desktop-nav { display: none; }
   .mobile-nav { display: block; position: relative; }
   .mobile-toggle { width: 48px; height: 48px; display: grid; place-items: center; border: 1px solid rgba(255,255,255,.15); border-radius: 50%; background: #f1efe9; color: #080b08; }
@@ -196,8 +199,8 @@ button { cursor: pointer; }
   .note-2 { top: 49%; left: 32px; }
   .note-3 { top: 64%; right: 32px; }
   .wish-note h2 { font-size: 42px; }
-  .panel-anchor { padding: 12px; }
-  .glass-wrap { height: 88vh; }
+  .panel-anchor { height: var(--app-height, 100vh); padding: 12px; }
+  .glass-wrap { height: var(--panel-height, 88vh); }
   .glass-panel { border-radius: 22px; }
   .panel-content { padding: 34px 22px; }
   .panel-content h2 { font-size: clamp(30px, 8.5vw, 46px); }

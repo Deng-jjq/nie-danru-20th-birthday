@@ -5,6 +5,7 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { ArrowDown, Flower2, Languages, MailOpen, Menu, Mic2, Music2, Pause, Play, Sparkles, Volume2, VolumeX, X } from "lucide-react";
 
 gsap.registerPlugin(ScrollTrigger, ScrollToPlugin);
+ScrollTrigger.config({ ignoreMobileResize: true });
 
 const ASSET_BASE = import.meta.env.BASE_URL;
 const assetPath = (path) => ASSET_BASE + path.replace(/^\//, "");
@@ -33,6 +34,7 @@ const COPY = {
     secretBody: "一座只为今晚点亮的秘密花园，藏着新一岁的花、光与惊喜。",
     soundOn: "打开声音，听见二十岁",
     soundOff: "暂停秘密花园音乐",
+    soundError: "声音未能启动，请再点一次",
     celebration: "聂丹茹，二十岁生日快乐！",
     giftTitle: "你的二十岁礼物间",
     giftIntro: "信件、朋友的声音与生日歌，都为你单独珍藏。",
@@ -46,6 +48,7 @@ const COPY = {
     songHint: "准备好以后，再亲手按下播放。",
     play: "播放",
     pause: "暂停",
+    audioRetry: "加载未完成，请再点一次播放",
   },
   en: {
     nav: ["Home", "Twenty", "Wishes"],
@@ -70,6 +73,7 @@ const COPY = {
     secretBody: "A secret garden lit only for tonight, holding flowers, light and one more surprise.",
     soundOn: "Turn on the sound of twenty",
     soundOff: "Pause the secret garden music",
+    soundError: "Sound could not start. Tap once more.",
     celebration: "Happy twentieth birthday, Nie Danru!",
     giftTitle: "Your twentieth-year gift room",
     giftIntro: "A letter, your friends' voices and a birthday song—each kept in its own place.",
@@ -83,6 +87,7 @@ const COPY = {
     songHint: "Press play whenever you are ready.",
     play: "Play",
     pause: "Pause",
+    audioRetry: "Still loading. Tap play once more.",
   },
 };
 
@@ -114,6 +119,7 @@ function ScrollVideo() {
   const videoRef = useRef(null);
   const wrapperRef = useRef(null);
   const posterRef = useRef(null);
+  const [source] = useState(() => assetPath(window.matchMedia("(max-width: 768px)").matches ? "hero-scrub-540p.mp4" : "hero-scrub-720p.mp4"));
   const [progress, setProgress] = useState(0);
   const [ready, setReady] = useState(false);
 
@@ -125,6 +131,7 @@ function ScrollVideo() {
     let lastSeekAt = 0;
     let rafId = 0;
     let seekTimer = 0;
+    let unlocked = false;
 
     const markReady = () => {
       duration = Number.isFinite(video.duration) ? video.duration : duration;
@@ -151,7 +158,11 @@ function ScrollVideo() {
 
       if (!duration || Math.abs(video.currentTime - latestTarget) < 1 / 48) return;
       lastSeekAt = now;
-      video.currentTime = Math.min(Math.max(latestTarget, 0), Math.max(duration - 1 / 48, 0));
+      try {
+        video.currentTime = Math.min(Math.max(latestTarget, 0), Math.max(duration - 1 / 48, 0));
+      } catch {
+        // Mobile Safari can briefly reject seeks while it is attaching the decoder.
+      }
     };
 
     const scheduleSeek = () => {
@@ -162,13 +173,40 @@ function ScrollVideo() {
     const onSeeked = () => scheduleSeek();
     const onMetadata = () => {
       duration = video.duration;
-      latestTarget = 0;
+      latestTarget = (scrollY / Math.max(document.documentElement.scrollHeight - innerHeight, 1)) * duration;
+      scheduleSeek();
+      ScrollTrigger.refresh();
     };
 
+    const unlockVideo = () => {
+      if (unlocked) return;
+      unlocked = true;
+      if (video.readyState === 0) video.load();
+      const playRequest = video.play();
+      if (!playRequest) {
+        video.pause();
+        scheduleSeek();
+        return;
+      }
+      playRequest.then(() => {
+        video.pause();
+        scheduleSeek();
+      }).catch(() => {
+        unlocked = false;
+      });
+    };
+
+    video.defaultMuted = true;
+    video.muted = true;
+    video.setAttribute("webkit-playsinline", "true");
+
     video.addEventListener("loadedmetadata", onMetadata);
+    video.addEventListener("loadeddata", markReady, { once: true });
+    video.addEventListener("canplay", markReady, { once: true });
     video.addEventListener("progress", updateProgress);
     video.addEventListener("canplaythrough", markReady, { once: true });
     video.addEventListener("seeked", onSeeked);
+    video.load();
 
     const trigger = ScrollTrigger.create({
       trigger: document.documentElement,
@@ -190,6 +228,8 @@ function ScrollVideo() {
     };
 
     addEventListener("mousemove", onMouseMove);
+    addEventListener("pointerdown", unlockVideo, { once: true, capture: true });
+    addEventListener("touchstart", unlockVideo, { once: true, passive: true, capture: true });
     const timeout = setTimeout(markReady, 4200);
 
     return () => {
@@ -198,7 +238,11 @@ function ScrollVideo() {
       clearTimeout(seekTimer);
       if (rafId) cancelAnimationFrame(rafId);
       removeEventListener("mousemove", onMouseMove);
+      removeEventListener("pointerdown", unlockVideo, { capture: true });
+      removeEventListener("touchstart", unlockVideo, { capture: true });
       video.removeEventListener("loadedmetadata", onMetadata);
+      video.removeEventListener("loadeddata", markReady);
+      video.removeEventListener("canplay", markReady);
       video.removeEventListener("progress", updateProgress);
       video.removeEventListener("seeked", onSeeked);
     };
@@ -206,10 +250,7 @@ function ScrollVideo() {
 
   return <>
     <div className="video-stage" ref={wrapperRef} aria-hidden="true">
-      <video ref={videoRef} className="scroll-video" poster={assetPath("birthday-hero.png")} muted playsInline preload="auto">
-        <source src={assetPath("hero-scrub-540p.mp4")} media="(max-width: 768px)" type="video/mp4" />
-        <source src={assetPath("hero-scrub-720p.mp4")} type="video/mp4" />
-      </video>
+      <video ref={videoRef} className="scroll-video" src={source} poster={assetPath("birthday-hero.png")} muted playsInline preload="auto" />
       <img ref={posterRef} className="video-poster" src={assetPath("birthday-hero.png")} alt="" />
       <div className="video-shade" />
     </div>
@@ -302,21 +343,21 @@ function createAmbientEngine() {
   const filter = context.createBiquadFilter();
   master.gain.value = .0001;
   filter.type = "lowpass";
-  filter.frequency.value = 1150;
+  filter.frequency.value = 2200;
   filter.Q.value = .35;
   master.connect(filter);
   filter.connect(context.destination);
 
   const pad = context.createGain();
-  pad.gain.value = .022;
+  pad.gain.value = .07;
   pad.connect(master);
-  [[130.81, "sine", -4], [196, "triangle", 5], [261.63, "sine", -8]].forEach(([frequency, type, detune]) => {
+  [[261.63, "sine", -4], [392, "triangle", 5], [523.25, "sine", -8]].forEach(([frequency, type, detune]) => {
     const oscillator = context.createOscillator();
     const gain = context.createGain();
     oscillator.type = type;
     oscillator.frequency.value = frequency;
     oscillator.detune.value = detune;
-    gain.gain.value = type === "triangle" ? .22 : .34;
+    gain.gain.value = type === "triangle" ? .32 : .44;
     oscillator.connect(gain).connect(pad);
     oscillator.start();
   });
@@ -334,7 +375,7 @@ function createAmbientEngine() {
     oscillator.type = noteIndex % 3 === 0 ? "triangle" : "sine";
     oscillator.frequency.value = notes[noteIndex++ % notes.length];
     gain.gain.setValueAtTime(.0001, now);
-    gain.gain.exponentialRampToValueAtTime(.026, now + .08);
+    gain.gain.exponentialRampToValueAtTime(.075, now + .08);
     gain.gain.exponentialRampToValueAtTime(.0001, now + 4.6);
     if (panner) {
       panner.pan.value = noteIndex % 2 ? -.28 : .28;
@@ -346,11 +387,16 @@ function createAmbientEngine() {
   return {
     async start() {
       clearTimeout(suspendTimer);
+      const unlockSource = context.createBufferSource();
+      unlockSource.buffer = context.createBuffer(1, 1, context.sampleRate);
+      unlockSource.connect(context.destination);
+      unlockSource.start();
       await context.resume();
+      if (context.state !== "running") throw new Error("AudioContext did not enter the running state");
       const now = context.currentTime;
       master.gain.cancelScheduledValues(now);
       master.gain.setValueAtTime(Math.max(master.gain.value, .0001), now);
-      master.gain.exponentialRampToValueAtTime(.42, now + 3);
+      master.gain.exponentialRampToValueAtTime(.62, now + 1.8);
       playChime();
       clearInterval(timer);
       timer = setInterval(playChime, 3800);
@@ -379,6 +425,7 @@ function AmbientMusicControl({ copy }) {
   const engineRef = useRef(null);
   const pauseRef = useRef(null);
   const [playing, setPlaying] = useState(false);
+  const [error, setError] = useState(false);
   useEffect(() => {
     const pauseAmbient = () => {
       engineRef.current?.stop();
@@ -398,15 +445,24 @@ function AmbientMusicControl({ copy }) {
       pauseRef.current?.();
       return;
     }
+    setError(false);
     audioRegistry.forEach((pause) => { if (pause !== pauseRef.current) pause(); });
     engineRef.current ||= createAmbientEngine();
-    if (!engineRef.current) return;
-    await engineRef.current.start();
-    setPlaying(true);
+    if (!engineRef.current) {
+      setError(true);
+      return;
+    }
+    try {
+      await engineRef.current.start();
+      setPlaying(true);
+    } catch {
+      setPlaying(false);
+      setError(true);
+    }
   };
   return <button className={`garden-sound ${playing ? "is-playing" : ""}`} onClick={toggle} aria-pressed={playing}>
     {playing ? <VolumeX size={17} /> : <Volume2 size={17} />}
-    <span>{playing ? copy.soundOff : copy.soundOn}</span>
+    <span>{error ? copy.soundError : playing ? copy.soundOff : copy.soundOn}</span>
 
   </button>;
 }
@@ -445,6 +501,7 @@ function AudioPlayer({ src, title, caption, copy }) {
   const [playing, setPlaying] = useState(false);
   const [current, setCurrent] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [error, setError] = useState("");
   useEffect(() => {
     const audio = audioRef.current;
     const pauseSelf = () => audio.pause();
@@ -453,22 +510,31 @@ function AudioPlayer({ src, title, caption, copy }) {
     const onDuration = () => setDuration(audio.duration || 0);
     const onPause = () => setPlaying(false);
     const onPlay = () => setPlaying(true);
+    const onCanPlay = () => setError("");
+    const onError = () => setError(copy.audioRetry);
     audio.addEventListener("timeupdate", onTime);
     audio.addEventListener("loadedmetadata", onDuration);
     audio.addEventListener("durationchange", onDuration);
     audio.addEventListener("pause", onPause);
     audio.addEventListener("play", onPlay);
+    audio.addEventListener("canplay", onCanPlay);
+    audio.addEventListener("error", onError);
     return () => {
       audio.pause(); audioRegistry.delete(pauseSelf);
       audio.removeEventListener("timeupdate", onTime); audio.removeEventListener("loadedmetadata", onDuration);
       audio.removeEventListener("durationchange", onDuration); audio.removeEventListener("pause", onPause); audio.removeEventListener("play", onPlay);
+      audio.removeEventListener("canplay", onCanPlay); audio.removeEventListener("error", onError);
     };
   }, []);
   const toggle = async () => {
     const audio = audioRef.current;
     if (audio.paused) {
+      setError("");
       audioRegistry.forEach((pause) => pause());
-      try { await audio.play(); } catch { setPlaying(false); }
+      audio.muted = false;
+      audio.volume = 1;
+      if (audio.readyState === 0 || audio.networkState === HTMLMediaElement.NETWORK_NO_SOURCE) audio.load();
+      try { await audio.play(); } catch { setPlaying(false); setError(copy.audioRetry); }
     } else audio.pause();
   };
   const seek = (event) => {
@@ -477,11 +543,11 @@ function AudioPlayer({ src, title, caption, copy }) {
     setCurrent(next);
   };
   return <article className={`audio-card ${playing ? "is-playing" : ""}`}>
-    <audio ref={audioRef} src={src} preload="metadata" />
+    <audio ref={audioRef} src={src} preload="auto" />
     <button className="audio-play" onClick={toggle} aria-label={`${playing ? copy.pause : copy.play} ${title}`}>
       {playing ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" />}
     </button>
-    <div className="audio-copy"><strong>{title}</strong>{caption && <span>{caption}</span>}
+    <div className="audio-copy"><strong>{title}</strong>{(error || caption) && <span className={error ? "audio-error" : ""} role={error ? "status" : undefined}>{error || caption}</span>}
       <div className="audio-timeline"><input type="range" min="0" max={duration || 0} step="0.01" value={Math.min(current, duration || 0)} onChange={seek} aria-label={title} /><time>{formatTime(current)} / {formatTime(duration)}</time></div>
     </div>
   </article>;
@@ -562,6 +628,32 @@ function GlassPanel({ copy }) {
 export function App() {
   const [language, setLanguage] = useState("zh");
   const copy = COPY[language];
+  useEffect(() => {
+    const root = document.documentElement;
+    let stableWidth = innerWidth;
+    let refreshTimer = 0;
+    const setStableViewport = () => {
+      root.style.setProperty("--app-height", String(innerHeight) + "px");
+      root.style.setProperty("--story-height", String(innerHeight * 5.8) + "px");
+      root.style.setProperty("--panel-height", String(innerHeight * .88) + "px");
+      clearTimeout(refreshTimer);
+      refreshTimer = setTimeout(() => ScrollTrigger.refresh(), 120);
+    };
+    const onResize = () => {
+      if (Math.abs(innerWidth - stableWidth) < 48) return;
+      stableWidth = innerWidth;
+      setStableViewport();
+    };
+    const onOrientation = () => setTimeout(setStableViewport, 240);
+    setStableViewport();
+    addEventListener("resize", onResize, { passive: true });
+    addEventListener("orientationchange", onOrientation, { passive: true });
+    return () => {
+      clearTimeout(refreshTimer);
+      removeEventListener("resize", onResize);
+      removeEventListener("orientationchange", onOrientation);
+    };
+  }, []);
   useEffect(() => {
     document.documentElement.lang = language === "zh" ? "zh-CN" : "en";
     const progress = document.querySelector(".page-progress span");
